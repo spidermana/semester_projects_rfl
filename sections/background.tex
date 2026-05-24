@@ -1,0 +1,32 @@
+
+\section{Background}
+\label{sec:bak}
+{\bf TEE on Android}.
+To mitigate the security risks inherent in monolithic kernels, the mobile industry has adopted the TEE to guarantee code integrity and data confidentiality~\cite{bove2024large, sabt2015trusted}. On Android devices, this is predominantly implemented via ARM TrustZone technology~\cite{pinto2019demystifying}, which partitions the processor into two distinct execution states: the normal world for the rich operating system and the secure world for the Trusted OS. This hardware-backed isolation ensures that sensitive resources remain protected even if the Android kernel is compromised. Transitions between these worlds are mediated by Secure Monitor, typically triggered by Secure Monitor Calls (SMC)~\cite{ngabonziza2016trustzone}. Within the secure world, vendor-specific Trusted Operating Systems—such as Qualcomm’s QSEE, Samsung’s TEEGris, or Xiaomi’s MiTEE—manage Trusted Applications (TAs), which are signed binaries executing specific security-critical logic~\cite{9152801}.
+
+{\bf Communication Mechanism}.
+The utility of the TEE relies on the GlobalPlatform TEE Client API specification, which standardizes the communication interface between Client Applications (CAs) in the normal world and TAs in the secure world~\cite{teeAPI, suzaki2020library}. To facilitate high-throughput operations, such as high-definition DRM content processing or biometric authentication, the specification supports Shared Memory mechanisms. This allows the TEE to access data structures located in the normal world's memory without the performance overhead of copying large buffers into the restricted secure world memory. Specifically, the API utilizes operations like \texttt{TEEC\_InvokeCommand} to pass parameters, which often include references to memory buffers (\texttt{TEEC\_MEMREF}) that act as the conduit for zero-copy data exchange.
+
+In practice, vendors prioritize these zero-copy transfer methods to maximize system performance, mapping the physical pages of the Client Application's buffer directly into the virtual address space of the Trusted Application. While efficient, this shared access model creates a scenario where the secure execution operates on data residing in unsecure physical RAM~\cite{machiry2017boomerang}. Consequently, unless specific shadow buffer copying mechanisms are enforced, the normal world retains write access to these memory pages concurrently while the Trusted Application is reading from them. This shared visibility, lacking intrinsic hardware locking for concurrent access, establishes the architectural precondition for race conditions.
+
+\begin{figure}[ht]
+        \input{listings/ta.tex}
+        \captionof{lstlisting}{
+            \yiwen{double check references and line numbers}
+           A TA's \texttt{TA\_InvokeCommandEntryPoint} function. The TA expects a single
+           argument buffer, containing an \texttt{in\_data} structure. The TA operates directly on the shared memory 
+            (\texttt{params[0].memref.buffer}) and ends up having three double fetches.
+           The first fetch is marked in \colorbox{blue!40}{blue} and the second fetches are marked in \colorbox{red!40}{red}.
+           While the double fetch on line 21 is harmless, the double fetch on line 23 may lead to a heap buffer overflow if 
+           a malicious NWCA modifies the value of \texttt{in->size} between lines 16 and 23. The code path of the double 
+           fetch on line 24 leads to a null pointer dereference, however this bug is triggerable without shared memory 
+            double fetches.
+        }
+        \label{lst:exdf}
+\end{figure}
+
+\textbf{Double Fetch Vulnerabilities}.
+While the shared memory mechanism is essential for performance, it introduces a critical attack surface where the untrusted normal world can modify data concurrently while the secure world processes it. This lack of hardware-enforced synchronization gives rise to Double Fetch vulnerabilities, a specific form of Time-of-Check to Time-of-Use (TOCTOU) race condition inherent to TEEs~\cite{wang2017double, schwarz2018automated}. A Double Fetch occurs when a privileged Trusted Application reads a value from the shared buffer twice: first to validate constraints (such as a buffer size check) and second to actually use the value (such as in a memory copy). An attacker controlling the normal world can exploit the race window between these two accesses to modify the memory content, changing a safe value to a malicious one after validation. This effectively bypasses the security check, leading to critical failures like heap overflows or arbitrary code execution within the secure perimeter~\cite{xu2018precise}.
+
+These vulnerable double fetches are of particular interest to attackers as they provide a direct path to compromise the TEE. By exploiting these flaws from the normal world, an adversary can achieve code execution within the vulnerable TA, effectively allowing them to pivot from the untrusted OS into the secure world. Furthermore, the issue is exacerbated by the design of TEE development environments compared to other privileged contexts. Unlike the Linux kernel, where access to untrusted memory is made explicit through mechanisms like \texttt{copy\_from\_user}, the TEE context typically exposes shared memory via raw pointers without such safeguards. Consequently, there is no enforced mechanism to ensure atomicity, placing the entire burden of securely handling \texttt{memref} buffer pointers and preventing race conditions solely on the TA developer.
+

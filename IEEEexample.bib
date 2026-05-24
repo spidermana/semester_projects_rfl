@@ -1,0 +1,196 @@
+
+IEEEexample.bib 
+V1.12 (2007/01/11)
+Copyright (c) 2002-2007 by Michael Shell
+See: http://www.michaelshell.org/
+for current contact information.
+
+This is an example BibTeX database for the official IEEEtran.bst
+BibTeX style file.
+
+Some entries call strings that are defined in the IEEEabrv.bib file.
+Therefore, IEEEabrv.bib should be loaded prior to this file. 
+Usage: 
+
+\bibliographystyle{./IEEEtran}
+\bibliography{./IEEEabrv,./IEEEexample}
+
+
+Support sites:
+http://www.michaelshell.org/tex/ieeetran/
+http://www.ctan.org/tex-archive/macros/latex/contrib/IEEEtran/
+and/or
+http://www.ieee.org/
+
+*************************************************************************
+Legal Notice:
+This code is offered as-is without any warranty either expressed or
+implied; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE! 
+User assumes all risk.
+In no event shall IEEE or any contributor to this code be liable for
+any damages or losses, including, but not limited to, incidental,
+consequential, or any other damages, resulting from the use or misuse
+of any information contained here.
+
+All comments are the opinions of their respective authors and are not
+necessarily endorsed by the IEEE.
+
+This work is distributed under the LaTeX Project Public License (LPPL)
+( http://www.latex-project.org/ ) version 1.3, and may be freely used,
+distributed and modified. A copy of the LPPL, version 1.3, is included
+in the base LaTeX documentation of all distributions of LaTeX released
+2003/12/01 or later.
+Retain all contribution notices and credits.
+** Modified files should be clearly indicated as such, including  **
+** renaming them and changing author support contact information. **
+
+File list of work: IEEEabrv.bib, IEEEfull.bib, IEEEexample.bib,
+                   IEEEtran.bst, IEEEtranS.bst, IEEEtranSA.bst,
+                   IEEEtranN.bst, IEEEtranSN.bst, IEEEtran_bst_HOWTO.pdf
+*************************************************************************
+
+
+Note that, because the example references were taken from actual IEEE
+publications, these examples do not always contain the full amount
+of information that may be desirable (for use with other BibTeX styles).
+In particular, full names (not abbreviated with initials) should be
+entered whenever possible as some (non-IEEE) bibliography styles use
+full names. IEEEtran.bst will automatically abbreviate when it encounters
+full names.
+ 
+Those fields that are not to be changed can be left out.
+@IEEEtranBSTCTL{IEEEexample:BSTcontrol,
+  CTLuse_article_number     = "yes",
+  CTLuse_paper              = "yes",
+  CTLuse_forced_etal        = "no",
+  CTLmax_names_forced_etal  = "10",
+  CTLnames_show_etal        = "1",
+  CTLuse_alt_spacing        = "yes",
+  CTLalt_stretch_factor     = "4",
+  CTLdash_repeated_names    = "yes",
+  CTLname_format_string     = "{f.~}{vv~}{ll}{, jj}",
+  CTLname_latex_cmd         = "",
+  CTLname_url_prefix        = "[Online]. Available:"
+}
+
+@misc{gpclient,
+author = {GlobalPlatform Device Technology},
+  title = {TEE Client API Specification Version 1.0},
+  url = "https://globalplatform.org/wp-content/uploads/2010/07/TEE\_Client\_API\_Specification-V1.0.pdf",
+month = {july},
+year = {2010},
+}
+
+
+@misc{gpinternal,
+author = {GlobalPlatform},
+  title = {TEE Internal Core API Specification Version 1.1.2.50},
+  url = "https://globalplatform.org/wp-content/uploads/2018/06/GPD\_TEE\_Internal\_Core\_API\_Specification\\\_v1.1.2.50\_PublicReview.pdf",
+month = {june},
+year = {2018},
+}
+
+
+# old ones
+
+
+
+
+@inproceedings{bove2024large,
+  title={A large-scale study on the prevalence and usage of tee-based features on android},
+  author={Bove, Davide},
+  booktitle={Proceedings of the 19th International Conference on Availability, Reliability and Security},
+  pages={1--11},
+  year={2024}
+}
+
+@inproceedings{sabt2015trusted,
+  title={Trusted execution environment: What it is, and what it is not},
+  author={Sabt, Mohamed and Achemlal, Mohammed and Bouabdallah, Abdelmadjid},
+  booktitle={2015 IEEE Trustcom/BigDataSE/Ispa},
+  volume={1},
+  pages={57--64},
+  year={2015},
+  organization={IEEE}
+}
+
+@article{pinto2019demystifying,
+  title={Demystifying arm trustzone: A comprehensive survey},
+  author={Pinto, Sandro and Santos, Nuno},
+  journal={ACM computing surveys (CSUR)},
+  volume={51},
+  number={6},
+  pages={1--36},
+  year={2019},
+  publisher={ACM New York, NY, USA}
+}
+
+@inproceedings{ngabonziza2016trustzone,
+  title={Trustzone explained: Architectural features and use cases},
+  author={Ngabonziza, Bernard and Martin, Daniel and Bailey, Anna and Cho, Haehyun and Martin, Sarah},
+  booktitle={2016 IEEE 2nd International Conference on Collaboration and Internet Computing (CIC)},
+  pages={445--451},
+  year={2016},
+  organization={IEEE}
+}
+
+@INPROCEEDINGS{9152801,
+  author={Cerdeira, David and Santos, Nuno and Fonseca, Pedro and Pinto, Sandro},
+  booktitle={2020 IEEE Symposium on Security and Privacy (SP)}, 
+  title={SoK: Understanding the Prevailing Security Vulnerabilities in TrustZone-assisted TEE Systems}, 
+  year={2020},
+  volume={},
+  number={},
+  pages={1416-1432},
+  keywords={Kernel;Security;Linux;Hardware;Androids;Humanoid robots;Computer bugs;TEE;TrustZone;Security Vulnerabilities;Arm},
+  doi={10.1109/SP40000.2020.00061}}
+
+@inproceedings{suzaki2020library,
+  title={Library implementation and performance analysis of GlobalPlatform TEE Internal API for Intel SGX and RISC-V Keystone},
+  author={Suzaki, Kuniyasu and Nakajima, Kenta and Oi, Tsukasa and Tsukamoto, Akira},
+  booktitle={2020 IEEE 19th International Conference on Trust, Security and Privacy in Computing and Communications (TrustCom)},
+  pages={1200--1208},
+  year={2020},
+  organization={IEEE}
+}
+
+@misc{teeAPI,
+title = {TEE Client API Specification v1.0},
+author = {GlobalPlatform},
+howpublished = {\url{https://globalplatform.org/wp-content/uploads/2010/07/TEE\_Client\_API\_Specification-V1.0.pdf}},
+year={2026}
+}
+
+@inproceedings{machiry2017boomerang,
+  title={BOOMERANG: Exploiting the Semantic Gap in Trusted Execution Environments.},
+  author={Machiry, Aravind and Gustafson, Eric and Spensky, Chad and Salls, Christopher and Stephens, Nick and Wang, Ruoyu and Bianchi, Antonio and Choe, Yung Ryn and Kruegel, Christopher and Vigna, Giovanni},
+  booktitle={NDSS},
+  pages={35},
+  year={2017}
+}
+
+@inproceedings{wang2017double,
+  title={How $\{$Double-Fetch$\}$ situations turn into $\{$Double-Fetch$\}$ vulnerabilities: A study of double fetches in the linux kernel},
+  author={Wang, Pengfei and Krinke, Jens and Lu, Kai and Li, Gen and Dodier-Lazaro, Steve},
+  booktitle={26th USENIX Security Symposium (USENIX Security 17)},
+  pages={1--16},
+  year={2017}
+}
+
+@inproceedings{schwarz2018automated,
+  title={Automated detection, exploitation, and elimination of double-fetch bugs using modern cpu features},
+  author={Schwarz, Michael and Gruss, Daniel and Lipp, Moritz and Maurice, Cl{\'e}mentine and Schuster, Thomas and Fogh, Anders and Mangard, Stefan},
+  booktitle={Proceedings of the 2018 on Asia Conference on Computer and Communications Security},
+  pages={587--600},
+  year={2018}
+}
+
+@inproceedings{xu2018precise,
+  title={Precise and scalable detection of double-fetch bugs in OS kernels},
+  author={Xu, Meng and Qian, Chenxiong and Lu, Kangjie and Backes, Michael and Kim, Taesoo},
+  booktitle={2018 IEEE Symposium on Security and Privacy (SP)},
+  pages={661--678},
+  year={2018},
+  organization={IEEE}
+}
