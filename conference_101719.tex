@@ -132,49 +132,21 @@ Trusted Execution Environment, Bug Detection, Double Fetch Vulnerabilities
 
 
 
-The Linux kernel has underpinned modern computing infrastructure for over
-three decades, running on everything from embedded devices and smartphones
-to cloud servers and supercomputers. Yet, despite its maturity and widespread
-deployment, the kernel remains a persistent source of critical security
-vulnerabilities. Memory safety errors---buffer overflows, use-after-free
-bugs, null-pointer dereferences, and out-of-bounds accesses---account for a
-disproportionate fraction of reported kernel CVEs. Empirical analyses of the
-Linux CVE database consistently show that a majority of high-severity
-vulnerabilities trace back to memory unsafety~\cite{TODO:cve_study,
-TODO:linux_memory_bugs}, a fundamental consequence of the kernel being written
-in C, a language that offers no compile-time guarantees over memory
-accesses and relies entirely on programmer discipline for correctness.
+The Linux kernel has underpinned modern computing infrastructure for over three decades, running on everything from embedded devices and smartphones
+to cloud servers and supercomputers. Yet, despite its maturity and widespread deployment, the kernel remains a persistent source of critical security
+vulnerabilities. Memory safety errors---buffer overflows, use-after-free, null-pointer dereferences, and out-of-bounds accesses---account for a disproportionate fraction of reported kernel CVEs. 
 
-Rust~\cite{TODO:rust_book} has emerged as a principled response to this
-challenge. As a modern systems programming language with memory safety as
-a first-class design goal, Rust enforces strict ownership, borrowing, and
-lifetime rules through its type system and borrow checker, statically
-eliminating entire classes of memory errors at compile time.
-Crucially, unlike garbage-collected languages, Rust achieves these guarantees
-without a runtime overhead, preserving the low-level control and performance
-required for kernel development.
+Empirical analyses of the Linux CVE database consistently show that a majority of high-severity vulnerabilities trace back to memory unsafety~\cite{TODO:cve_study,TODO:linux_memory_bugs}, a fundamental consequence of the kernel being written in C, a language that offers no compile-time guarantees over memory accesses and relies entirely on programmer discipline for correctness. Furthermore, in the LLM era, the number of vulnerabilities reported by LLMs to Linux kernel has increased significantly, making it more difficult to Linux community to patch vulnerabilities in a timely manner~\cite{TODO:llm_vulnerabilities_to_linux}.
 
-Motivated by these properties, the Rust for Linux
-project~\cite{TODO:ojeda2022rust, TODO:rustforlinux} was initiated to
-introduce Rust as a second implementation language in the Linux kernel.
-The goal is not to rewrite the existing kernel in Rust, but to allow new
-drivers and kernel subsystems to be developed in idiomatic, safe Rust.
-After extensive preparatory work spanning several years, Rust support was
-merged into the mainline kernel at Linux~v6.1. Today, Rust is widely
-regarded as a successful second language in the kernel community, and its
-status has continued to mature following the removal of the
-``experimental'' label in Linux~v6.19.
-The project follows a layered architecture: the existing C kernel
-infrastructure forms the foundation; a thin layer of \texttt{unsafe} Rust
-bindings bridges Rust to the C~APIs; a \emph{safe abstraction layer} wraps
-these bindings and exposes ergonomic, safe Rust interfaces; and Rust
-drivers are then built on top of this abstraction layer.
-This design localizes unsafety to the abstraction layer and shields driver
-code from direct C interoperability hazards.
+Rust~\cite{TODO:rust_book} has emerged as a feasible and principled response to this challenge. As a modern system programming language with memory safety and efficiency as its core design goals, Rust enforces strict ownership, borrowing, and lifetime rules through its type system and borrow checker, statically and dramatically eliminating most classes of memory errors at compile time. Unlike garbage-collected languages, it is crucial to note that Rust achieves these guarantees without a runtime overhead, preserving the low-level control and performance required for kernel development.
 
-Despite this architecture, Rust's memory safety guarantees are not absolute
-in the kernel context. The \texttt{unsafe} keyword marks code regions where
-the compiler relaxes its safety invariants, permitting raw pointer
+Motivated by these properties, the Rust for Linux project~\cite{TODO:ojeda2022rust, TODO:rustforlinux} was initiated to introduce Rust as a second implementation language in the Linux kernel. The goal is not to rewrite the existing kernel in Rust, but to allow newly-involved security-critical drivers and kernel subsystems to be developed in idiomatic, safe Rust.
+After extensive preparatory work spanning several years, Rust support was merged into the mainline kernel at Linux~v6.1~\cite{TODO:linux_v6.1}. Today, Rust is widely regarded as a successful second language in the kernel community, and its status has continued to mature following the removal of the ``experimental'' label in Linux~v6.19~\cite{TODO:linux_v6.19}.
+The project follows a layered architecture: the existing C kernel infrastructure forms the foundation; a thin layer of \texttt{unsafe} Rust bindings bridges Rust to the C~APIs; an elaborately-designed and carefully-reviewed \emph{safe abstraction layer} wraps these bindings and exposes ergonomic, safe Rust interfaces; and Rust drivers are then built on top of this abstraction layer.
+This design localizes majority of \texttt{unsafe} blocks, the only source of memory safety issues in Rust code, to the abstraction layer and shields the leaf driver code from direct C interoperability hazards and the associated security risks.
+
+Despite this architecture, Rust's memory safety guarantees are not absolute in the kernel context. 
+The \texttt{unsafe} keyword marks code regions where the compiler relaxes its safety invariants, permitting raw pointer
 dereferences, foreign function calls to C, and other low-level operations.
 In Rust for Linux, \texttt{unsafe} blocks are an unavoidable necessity:
 the fundamental mismatch between Rust's strict ownership model and C's type
