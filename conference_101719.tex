@@ -145,13 +145,11 @@ After extensive preparatory work spanning several years, Rust support was merged
 The project follows a layered architecture: the existing C kernel infrastructure forms the foundation; a thin layer of \texttt{unsafe} Rust bindings bridges Rust to the C~APIs; an elaborately-designed and carefully-reviewed \emph{safe abstraction layer} wraps these bindings and exposes ergonomic, safe Rust interfaces; and Rust drivers are then built on top of this abstraction layer.
 This design localizes majority of \texttt{unsafe} blocks, the only source of memory safety issues in Rust code, to the abstraction layer and shields the leaf driver code from direct C interoperability hazards and the associated security risks.
 
-Despite this architecture, Rust's memory safety guarantees are not absolute in the kernel context. 
-The \texttt{unsafe} keyword marks code regions where the compiler relaxes its safety invariants, permitting raw pointer
-dereferences, foreign function calls to C, and other low-level operations.
-In Rust for Linux, \texttt{unsafe} blocks are an unavoidable necessity:
-the fundamental mismatch between Rust's strict ownership model and C's type
-system---in particular around pointer aliasing, validity, and lifetime
-management---means that no safe abstraction can be built without an
+Despite this architecture, Rust's memory safety guarantees are not absolute or unconditional in the kernel context. 
+The \texttt{unsafe} keyword marks code regions where the compiler relaxes its safety invariants for five superpowers.
+It allows raw pointer dereferences, unsafe function calls (including calls to foreign language interface), mutable static variable access, unsafe casts, and union field operations.
+Those superpowers are necessary for the feasible implementation of Rust-based system or programs in terms of performance and functionality, such as interrupt handling, memory management, and low-level device drivers.
+Especially, in Rust for Linux, \texttt{unsafe} blocks are an unavoidable necessity: the fundamental mismatch between Rust's strict ownership model and C's type system---in particular around pointer aliasing, validity, and lifetime management---means that no safe abstraction can be built without an
 \texttt{unsafe} foundation.
 The project therefore adopts a discipline: \texttt{unsafe} code should be
 confined to the abstraction layers, rigorously documented, and individually
