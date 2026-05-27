@@ -78,8 +78,7 @@ is a routine building block of kernel code.
   \label{lst:unsafe_example}
   \end{figure}
 
-The \texttt{unsafe} keyword exists precisely to cover these gaps. It marks code regions where the compiler relaxes its safety invariants, granting five additional capabilities: dereferencing raw pointers, calling \texttt{unsafe} functions (including FFI), accessing or modifying mutable static variables, implementing \texttt{unsafe} traits, and accessing union fields.
-Listing~\ref{lst:unsafe_example} illustrates two representative uses: (i)~a
+The \texttt{unsafe} keyword exists precisely to cover these gaps. It marks code regions where the compiler relaxes its safety invariants, granting five additional capabilities: dereferencing raw pointers, calling \texttt{unsafe} functions (including FFI), accessing or modifying mutable static variables, implementing \texttt{unsafe} traits, and accessing union fields. \autoref{lst:unsafe_example} illustrates two representative uses: (i)~a
 raw-pointer dereference, and (ii)~an FFI call to a C function.
 The programmer is solely responsible for upholding the safety invariants the
 compiler no longer checks. Importantly, any violation inside unsafe blocks will result in undefined behavior and further propagate to the subsequent safe code.
@@ -92,7 +91,6 @@ Notably, \texttt{unsafe} Rust therefore requires a strong discipline from the pr
   \centering
   \caption{Key milestones and representative Rust drivers in the Linux kernel.
   \cmark{} indicates merged into mainline; \xmark{} indicates out-of-tree.}
-  \label{tab:rust_drivers}
   \footnotesize
   \setlength{\tabcolsep}{4pt}
   \renewcommand{\arraystretch}{1.12}
@@ -166,6 +164,7 @@ Notably, \texttt{unsafe} Rust therefore requires a strong discipline from the pr
       & \xmark{} \\
     \bottomrule
   \end{tabular*}
+  \label{tab:rust_drivers}
 \end{table*}
 
 
@@ -197,7 +196,7 @@ With the expansion of Rust in the kernel, the team gradually imported and vendor
 
 As the project has grown substantially, the number of Rust abstractions and drivers has increased with each release. The \emph{experimental} designation was formally concluded at the Linux Kernel Maintainers Summit in December~2025, signaling the community's confidence in Rust as a second language for Linux.
 
-By this point over 300,000 lines of Rust code had been upstreamed. Table~\ref{tab:rust_drivers} summarizes representative drivers that have been merged into the mainline kernel or are under active
+By this point over 300,000 lines of Rust code had been upstreamed. \autoref{tab:rust_drivers} summarizes representative drivers that have been merged into the mainline kernel or are under active
 out-of-tree development. Among them, the Rust binder was already deployed on Android 16 in mid-2025 and shipped in Samsung’s Galaxy Z Fold 7 and Galaxy Z Flip 7.
 
 
