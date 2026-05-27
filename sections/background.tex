@@ -1,32 +1,226 @@
 
+% ---- Rust language definition and colours (shared by all listings) ----
+\definecolor{light-gray}{gray}{0.975}
+\definecolor{darkgreen}{rgb}{0,0.5,0}
+\definecolor{pblue}{rgb}{0.13,0.13,1}
+\definecolor{pred}{rgb}{0.9,0,0}
+\lstdefinelanguage{Rust}{
+  keywords={fn, let, mut, unsafe, pub, struct, impl, trait, self, return,
+             if, else, while, for, in, use, mod, extern, static, type,
+             enum, match, true, false, as, ref, move, where},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]",
+}
+\lstset{
+  language=Rust,
+  backgroundcolor=\color{light-gray},
+  basicstyle=\fontencoding{T1}\selectfont\footnotesize,
+  commentstyle=\color{darkgreen!80},
+  keywordstyle=\color{pblue},
+  stringstyle=\color{pred},
+  frame=single,
+  showstringspaces=false,
+  numbers=left,
+  numberstyle=\tiny\color{black},
+  numbersep=4pt,
+  xleftmargin=5pt,
+  xrightmargin=5pt,
+  tabsize=4,
+}
+% -----------------------------------------------------------------------
+
 \section{Background}
-\label{sec:bak}
-{\bf TEE on Android}.
-To mitigate the security risks inherent in monolithic kernels, the mobile industry has adopted the TEE to guarantee code integrity and data confidentiality~\cite{bove2024large, sabt2015trusted}. On Android devices, this is predominantly implemented via ARM TrustZone technology~\cite{pinto2019demystifying}, which partitions the processor into two distinct execution states: the normal world for the rich operating system and the secure world for the Trusted OS. This hardware-backed isolation ensures that sensitive resources remain protected even if the Android kernel is compromised. Transitions between these worlds are mediated by Secure Monitor, typically triggered by Secure Monitor Calls (SMC)~\cite{ngabonziza2016trustzone}. Within the secure world, vendor-specific Trusted Operating Systems—such as Qualcomm’s QSEE, Samsung’s TEEGris, or Xiaomi’s MiTEE—manage Trusted Applications (TAs), which are signed binaries executing specific security-critical logic~\cite{9152801}.
+\label{sec:background}
 
-{\bf Communication Mechanism}.
-The utility of the TEE relies on the GlobalPlatform TEE Client API specification, which standardizes the communication interface between Client Applications (CAs) in the normal world and TAs in the secure world~\cite{teeAPI, suzaki2020library}. To facilitate high-throughput operations, such as high-definition DRM content processing or biometric authentication, the specification supports Shared Memory mechanisms. This allows the TEE to access data structures located in the normal world's memory without the performance overhead of copying large buffers into the restricted secure world memory. Specifically, the API utilizes operations like \texttt{TEEC\_InvokeCommand} to pass parameters, which often include references to memory buffers (\texttt{TEEC\_MEMREF}) that act as the conduit for zero-copy data exchange.
+\subsection{Rust and its \texttt{unsafe} Keyword}
 
-In practice, vendors prioritize these zero-copy transfer methods to maximize system performance, mapping the physical pages of the Client Application's buffer directly into the virtual address space of the Trusted Application. While efficient, this shared access model creates a scenario where the secure execution operates on data residing in unsecure physical RAM~\cite{machiry2017boomerang}. Consequently, unless specific shadow buffer copying mechanisms are enforced, the normal world retains write access to these memory pages concurrently while the Trusted Application is reading from them. This shared visibility, lacking intrinsic hardware locking for concurrent access, establishes the architectural precondition for race conditions.
+Rust~\cite{TODO:rust_book} is a systems programming language designed to
+deliver C-level performance while statically guaranteeing memory safety.
+Its central mechanism is the \emph{ownership} system and the \emph{borrow checker}.
+In the \emph{ownership} view, every value has a single owner, and ownership can be transferred (\emph{moved}) or temporarily loaned via \emph{references}.
+The borrow checker enforces two invariants on \emph{references} at compile time. 
+First, at any point in the program, a value may have either any number of immutable references or exactly one mutable reference, but not both. Second, no reference may outlive the value it points to.
+These rules, together with \emph{lifetimes}, make reference validity explicit in functions and eliminate memory safety issues like use-after-free and dangling-pointer bugs.
 
-\begin{figure}[ht]
-        \input{listings/ta.tex}
-        \captionof{lstlisting}{
-            \yiwen{double check references and line numbers}
-           A TA's \texttt{TA\_InvokeCommandEntryPoint} function. The TA expects a single
-           argument buffer, containing an \texttt{in\_data} structure. The TA operates directly on the shared memory 
-            (\texttt{params[0].memref.buffer}) and ends up having three double fetches.
-           The first fetch is marked in \colorbox{blue!40}{blue} and the second fetches are marked in \colorbox{red!40}{red}.
-           While the double fetch on line 21 is harmless, the double fetch on line 23 may lead to a heap buffer overflow if 
-           a malicious NWCA modifies the value of \texttt{in->size} between lines 16 and 23. The code path of the double 
-           fetch on line 24 leads to a null pointer dereference, however this bug is triggerable without shared memory 
-            double fetches.
-        }
-        \label{lst:exdf}
-\end{figure}
 
-\textbf{Double Fetch Vulnerabilities}.
-While the shared memory mechanism is essential for performance, it introduces a critical attack surface where the untrusted normal world can modify data concurrently while the secure world processes it. This lack of hardware-enforced synchronization gives rise to Double Fetch vulnerabilities, a specific form of Time-of-Check to Time-of-Use (TOCTOU) race condition inherent to TEEs~\cite{wang2017double, schwarz2018automated}. A Double Fetch occurs when a privileged Trusted Application reads a value from the shared buffer twice: first to validate constraints (such as a buffer size check) and second to actually use the value (such as in a memory copy). An attacker controlling the normal world can exploit the race window between these two accesses to modify the memory content, changing a safe value to a malicious one after validation. This effectively bypasses the security check, leading to critical failures like heap overflows or arbitrary code execution within the secure perimeter~\cite{xu2018precise}.
+\emph{Trait} is another core concept in Rust. It declares a set of methods or associated types that a type should implement and improve the extensibility of the type's behavior. It also serves as Rust's mechanism for abstraction and polymorphism.
+For example, traits can be used as generic bounds (e.g., \texttt{T:~Send + Sync}) to
+encode contracts statically, so that properties like thread-safety are checked at compile time rather than enforced by uncontrollable programming conventions.
 
-These vulnerable double fetches are of particular interest to attackers as they provide a direct path to compromise the TEE. By exploiting these flaws from the normal world, an adversary can achieve code execution within the vulnerable TA, effectively allowing them to pivot from the untrusted OS into the secure world. Furthermore, the issue is exacerbated by the design of TEE development environments compared to other privileged contexts. Unlike the Linux kernel, where access to untrusted memory is made explicit through mechanisms like \texttt{copy\_from\_user}, the TEE context typically exposes shared memory via raw pointers without such safeguards. Consequently, there is no enforced mechanism to ensure atomicity, placing the entire burden of securely handling \texttt{memref} buffer pointers and preventing race conditions solely on the TA developer.
+Compared with C, safe Rust alone, however, cannot express all the patterns required for efficient and flexible programming, like for kernel development. For instance, doubly-linked intrusive lists, like ``struct hlist\_head'' or ``struct list\_node'' in Linux kernel, requires each node to hold both a forward and a backward pointer into the same list, which violates Rust's single-ownership rule or no mutable aliasing. The borrow checker simply cannot verify that such aliased mutations are safe.
+Likewise, self-referential structures, zero-copy DMA buffers, and shared
+mutable global state all fall outside what safe Rust can express, yet each
+is a routine building block of kernel code.
 
+
+\begin{figure}[b]
+  \begin{lstlisting}[columns=fullflexible]
+  // (i) raw-pointer dereference
+  fn read_raw(ptr: *const u32) -> u32 {
+      unsafe { *ptr }            // compiler does NOT check validity
+  }
+  
+  // (ii) FFI call to a C kernel function
+  extern "C" {
+      fn kmalloc(size: usize, flags: u32) -> *mut u8;
+  }
+  pub fn alloc_buf(size: usize) -> *mut u8 {
+      unsafe { kmalloc(size, 0x80) }  // GFP_KERNEL = 0x80
+  }
+  \end{lstlisting}
+  \captionof{lstlisting}{%
+    Two representative \texttt{unsafe} Rust patterns.
+    Raw-pointer dereference (lines 2--4) bypasses the borrow checker;
+    the FFI call (lines 7--12) crosses the Rust-C boundary.
+    Both require the programmer to manually uphold safety invariants.}
+  \label{lst:unsafe_example}
+  \end{figure}
+
+The \texttt{unsafe} keyword exists precisely to cover these gaps. It marks code regions where the compiler relaxes its safety invariants, granting five additional capabilities: dereferencing raw pointers, calling \texttt{unsafe} functions (including FFI), accessing or modifying mutable static variables, implementing \texttt{unsafe} traits, and accessing union fields.
+Listing~\ref{lst:unsafe_example} illustrates two representative uses: (i)~a
+raw-pointer dereference, and (ii)~an FFI call to a C function.
+The programmer is solely responsible for upholding the safety invariants the
+compiler no longer checks. Importantly, any violation inside unsafe blocks will result in undefined behavior and further propagate to the subsequent safe code.
+Notably, \texttt{unsafe} Rust therefore requires a strong discipline from the programmers and requests for strict encapsulation into safe APIs, so that callers do not need to reason about low-level invariants. To sum up, the \texttt{unsafe} keyword gives programmers the power to write code that is not expressible in safe Rust, but also hands over the responsibility to ensure that the code is safe to the programmers.
+
+
+
+
+\begin{table*}[!t]
+  \centering
+  \caption{Key milestones and representative Rust drivers in the Linux kernel.
+  \cmark{} indicates merged into mainline; \xmark{} indicates out-of-tree.}
+  \label{tab:rust_drivers}
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
+  \renewcommand{\arraystretch}{1.12}
+
+  \begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}%
+    l l p{0.42\textwidth} p{0.18\textwidth} c}
+    \toprule
+    \textbf{Year} & \textbf{Kernel} & \textbf{Driver / Component}
+    & \textbf{Category} & \textbf{Mainline} \\
+    \midrule
+    2022 & v6.1
+      & Rust core infrastructure (Toolchains, \texttt{alloc} Crate, Abstractions)
+      & Foundation
+      & \cmark{} \\
+
+    2024 & v6.8
+      & ASIX AX88796B PHY (First Rust Driver Upstreamed)
+      & Network / PHY
+      & \cmark{} \\
+
+    2024 & v6.11
+      & Null Block Driver
+      & Block / Storage
+      & \cmark{} \\
+
+    2024 & v6.12
+      & AMCC QT2025 10\,Gbit PHY
+      & Network / PHY
+      & \cmark{} \\
+
+    2024 & v6.12
+      & DRM Panic QR Code Generator
+      & DRM / Display
+      & \cmark{} \\
+
+    2025 & v6.15
+      & Nova GPU Driver (NVIDIA Turing+, GSP-based)
+      & DRM / GPU
+      & \cmark{} \\
+
+    2025 & v6.18
+      & Android Binder IPC Driver
+      & Android / IPC
+      & \cmark{} \\
+
+    2025 & v6.18
+      & Tyr DRM Driver for Arm Mali GPUs
+      & DRM / GPU
+      & \cmark{} \\
+    \midrule
+    \multicolumn{5}{@{}l}{\emph{Out-of-tree drivers and components under active development}} \\
+    \midrule
+    -- & --
+      & NVMe Driver
+      & Block / Storage
+      & \xmark{} \\
+
+    -- & --
+      & Apple AGX GPU Driver for Asahi Linux
+      & DRM / GPU
+      & \xmark{} \\
+
+    -- & --
+      & PuzzleFS Filesystem
+      & Filesystem
+      & \xmark{} \\
+
+    -- & --
+      & Android ashmem
+      & Android / IPC
+      & \xmark{} \\
+    \bottomrule
+  \end{tabular*}
+\end{table*}
+
+
+\subsection{Rust for Linux}
+
+The idea of using Rust in the Linux kernel was first raised in 2020~\cite{TODO:rfl_initial_rfc} and gained traction through a series of RFC patches submitted by Ojeda et al.~\cite{TODO:ojeda2022rust}.
+The core rationale was threefold: (i) to eliminate the memory safety bugs that
+persistently afflict C kernel code, (ii) to provide a more ergonomic development
+experience with modern language tooling, and (iii) to do so without compromising
+the kernel's performance or stability.
+Linus Torvalds accepted the initial Rust infrastructure into the staging tree,
+and Rust was formally merged into the mainline kernel with Linux~v6.1 in December~2022, making it a second language to the kernel in over two decades after C++.
+% An independent empirical study by Li et al.~\cite{TODO:li2024empirical}examined this process through developer mailing lists and patch histories,
+% identifying the practical successes (toolchain integration, driver
+% prototypes), points of dissatisfaction (build system complexity, upstream
+% review burden), and compromises that shaped the project's early trajectory.
+
+
+The integration of Rust into the Linux kernel proceeded through a multi-year, incremental process led by Miguel Ojeda. 
+The effort began as the Rust for Linux project in 2020, and a formal RFC patch series proposing Rust support was submitted to the Linux Kernel Mailing List on 14 April 2021, drawing both interest and reservations from Linus Torvalds and other maintainers. 
+After further development and testing in the linux-next tree, the initial Rust infrastructure was merged into the mainline kernel on 3 October 2022, debuting in the Linux
+~v6.1 release as experimental support. This initial contribution comprised roughly 12,500 lines of code providing only basic infrastructure, with kernel builds incorporating optional Rust support. 
+A significant subsequent milestone came in December 2023, when the first Rust drivers, covering areas such as network PHYs and panic QR-code logging, were accepted, and released in kernel version 6.8. 
+The Rust for Linux project adopted a customized ``no\_std'' Rust environment for the kernel. 
+
+For special requirements for the kernel, such as no panicking on allocation failure, the team initially maintained a customized in-tree fork for the `alloc' crate to add fallible (`try\_*') variants that return a Result instead of panicking.
+After upstream Rust absorbed those capabilities, the fork was dropped in Linux~v6.10 (released in 2024) and `alloc' is fundamentally a runtime dependency for the kernel. 
+With the expansion of Rust in the kernel, the team gradually imported and vendored third-party macro-parsing libraries, such as ``proc-macro2'', ``quote'', and ``syn'', directly into the kernel source tree from Linux~v6.19
+
+As the project has grown substantially, the number of Rust abstractions and drivers has increased with each release. The \emph{experimental} designation was formally concluded at the Linux Kernel Maintainers Summit in December~2025, signaling the community's confidence in Rust as a second language for Linux.
+
+By this point over 300,000 lines of Rust code had been upstreamed. Table~\ref{tab:rust_drivers} summarizes representative drivers that have been merged into the mainline kernel or are under active
+out-of-tree development. Among them, the Rust binder was already deployed on Android 16 in mid-2025 and shipped in Samsung’s Galaxy Z Fold 7 and Galaxy Z Flip 7.
+
+
+
+% This approach mirrors the encapsulation principle described in
+% Section~\ref{sec:background}, applied systematically at kernel scale.
+% Since v6.1, the project has grown substantially: the number of in-tree Rust
+% abstractions and drivers has increased across each release, and the
+% \emph{experimental} designation was removed in Linux~v6.19, signaling the
+% community's confidence in Rust as a first-class kernel language.
+
+
+% The design of Rust for Linux follows a layered abstraction
+% principle~\cite{TODO:ojeda2022rust}. the existing C kernel infrastructure is
+% left untouched at the bottom; above it, \emph{bindings} provide raw,
+% \texttt{unsafe} Rust declarations of C types and functions generated from
+% kernel headers; a hand-written \emph{safe abstraction layer} wraps these
+% bindings into idiomatic Rust types and functions that enforce the kernel's
+% object lifecycle invariants via the type system; and finally, Rust
+% \emph{drivers} are written entirely in safe Rust against this abstraction
+% layer (Figure~\ref{fig:rfl_layers}). % TODO: add architecture figure
+% The fundamental discipline is that \texttt{unsafe} code must not leak into
+% driver code: every kernel invariant---allocation lifetimes, lock
+% disciplines, reference counting---must be encoded as a type-level contract
+% in the abstraction layer, so the compiler enforces correctness for all
+% code that builds on top of it.

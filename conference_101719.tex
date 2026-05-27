@@ -10,6 +10,8 @@
 \usepackage{booktabs} 
 \usepackage{makecell} 
 \usepackage{multirow} 
+\usepackage{booktabs}
+\usepackage{array}
 \usepackage{siunitx} 
 \usepackage{pifont}
 \newcommand{\cmark}{\ding{51}}%
@@ -159,9 +161,9 @@ TypePulse~\cite{TODO:typepulse} takes a type-confusion-centric approach, identif
 While all three tools target \texttt{unsafe}-related memory bugs, they differ in their underlying representations, targeted vulnerability classes, and scope: RUDRA and SafeDrop are designed for the Rust crate ecosystem, whereas TypePulse is specifically oriented toward cross-language type safety at FFI boundaries.
 
 Another line of Rust research takes an empirical perspective on how \texttt{unsafe} code is actually adopted across the Rust ecosystem.
-Evans et al.~\cite{evans2020rust} conducted one of the first large-scale studies of \texttt{unsafe} usage across crates.io, finding that although fewer than 30\% of libraries invoke the \texttt{unsafe} keyword directly, the majority cannot be fully statically verified by the compiler because unsafeness propagates transitively through dependency call chains.
-Astrauskas et al.~\cite{astrauskas2020programmers} subsequently evaluated the so-called \emph{Rust hypothesis}, which holds that programmers use \texttt{unsafe} sparingly, keep it easy to review, and hide it behind safe abstractions. They tested this hypothesis by querying a large corpus of crates with their QRATES tool over both source code and MIR. They identified six recurring motivations for \texttt{unsafe} code and reported that the hypothesis holds only partially.
-Cui et al.~\cite{cui2024achilles} approached the problem from the perspective of safety requirements rather than usage frequency. By analyzing the standard library's \texttt{unsafe} API documentation, they distilled 19 safety properties, labeled 416 \texttt{unsafe} APIs, and cross-referenced them against historical Rust CVEs and crates.io usage, revealing that the documented safety requirements are frequently inconsistent and incomplete. It poses the challenge to Rust programmers to understand and fulfill the safety requirements accordingly.
+Evans et al.~\cite{TODO:evans2020rust} conducted one of the first large-scale studies of \texttt{unsafe} usage across crates.io, finding that although fewer than 30\% of libraries invoke the \texttt{unsafe} keyword directly, the majority cannot be fully statically verified by the compiler because unsafeness propagates transitively through dependency call chains.
+Astrauskas et al.~\cite{TODO:astrauskas2020programmers} subsequently evaluated the so-called \emph{Rust hypothesis}, which holds that programmers use \texttt{unsafe} sparingly, keep it easy to review, and hide it behind safe abstractions. They tested this hypothesis by querying a large corpus of crates with their QRATES tool over both source code and MIR. They identified six recurring motivations for \texttt{unsafe} code and reported that the hypothesis holds only partially.
+Cui et al.~\cite{TODO:cui2024achilles} approached the problem from the perspective of safety requirements rather than usage frequency. By analyzing the standard library's \texttt{unsafe} API documentation, they distilled 19 safety properties, labeled 416 \texttt{unsafe} APIs, and cross-referenced them against historical Rust CVEs and crates.io usage, revealing that the documented safety requirements are frequently inconsistent and incomplete. It poses the challenge to Rust programmers to understand and fulfill the safety requirements accordingly.
 
 Different from these studies all characterizing \texttt{unsafe} usage or obligations of Rust-based codebases across the open-source crate ecosystem at large, Li et al.~\cite{TODO:li2024empirical} conducted the first large-scale qualitative study of Rust's integration into the C-written Linux kernel.
 It examines the Rust for Linux project through developer mailing lists, patch discussions, and issue reports, documenting sources of success, dissatisfaction, and compromise in the project's early stages.
@@ -198,11 +200,29 @@ Further, we systematically summarize the rationale behind \texttt{unsafe} usage,
 
 \input{sections/design}
 
-\input{sections/evaluation}
+\input{sections/unsafe}
+
+\input{sections/practice}
 
 \section{Conclusion}
 
-TODO
+This paper presented a systematic study of the evolution of Rust for Linux,
+examining how the project has matured from its initial experimental
+infrastructure in Linux~v6.1 to a non-experimental, production-quality
+second language in the kernel.
+Our analysis of the abstraction layer architecture reveals that the design
+has evolved incrementally but deliberately. The \texttt{unsafe} code is
+consistently confined to the Rust-C binding and abstraction layer, while
+driver code built on top remains largely free of \texttt{unsafe} blocks.
+
+Our characterization of \texttt{unsafe} usage further shows that the
+dominant motivations, including FFI calls, raw pointer manipulation, and shared
+mutable state, are inherent to the C~interface rather than to poor Rust
+practice, underscoring that \texttt{unsafe} in the kernel context is
+a necessary and contained cost rather than a sign of unsound design.
+
+Different from the insights from Rust crate ecosystem, any project that integrates Rust into a large, pre-existing C codebase have to face the same fundamental tension between Rust's ownership model and C's unconstrained type system during their co-existence.
+Importantly, our findings can help practitioners establish robust practices for Rust-involving system-level software projects, supporting their transition from promising prototypes to reliable infrastructure.
 
 \bibliographystyle{IEEEtran}
 \bibliography{IEEEexample}

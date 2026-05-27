@@ -1,47 +1,7 @@
+\section{Design of Rust for Linux}
 
-\section{Design}
+\subsection{Design Principles}
 
+\subsection{Primitives of the Safe Abstraction Layer}
 
-\begin{figure*}[h!]
-    \centering
-    \input{figures/overview.tex}
-    \caption{
-      Overview of SHMuzz. 
-      }
-    \label{fig:overview}
-  \end{figure*}
-
-  
-Because shared memory is difficult to use safely and double-fetch bugs can result in severe memory corruption, We conduct the first dedicated study of double-fetch vulnerabilities in Trusted Applications. This effort requires an automated technique capable of uncovering attacker-triggerable flaws in large collections of proprietary, binary-only TAs.
-
-To meet this need, We introduce SHMuzz, a dynamic, three-stage framework for detecting double-fetch vulnerabilities without access to source code. Although static analysis can theoretically examine all execution paths, it typically generates many false positives. In practice, most reported double fetches are not exploitable due to complex path constraints, limited attacker influence, or code that cannot be reached from the normal world. Such results are of limited value for real-world TA security due to the strictly defined attack surface.
-
-For this reason, SHMuzz adopts a targeted dynamic approach that focuses exclusively on code paths reachable through TA entrypoints exposed to normal-world clients. The framework operates in three phases. (1) {\bf Exploration}, which locates overlapping memory accesses in attacker-reachable code; (2) {\bf Double Fetch Snapshot Fuzzing}, which tests whether these accesses can be exploited; and (3) {\bf Distillation}, which filters out crashes that are not specifically caused by shared-memory races. Together, these stages enable precise and practical detection of real double-fetch vulnerabilities.
-
-
-\subsection{Exploration}
-Bochspwn is limited by its reliance on traces collected during normal device usage, which restricts its coverage and requires manual interaction to exercise security-relevant code paths. In contrast, SHMuzz employs coverage-guided greybox fuzzing to automatically explore TA behavior and trigger rarely executed functionality that would otherwise remain untested.
-
-According to the DEADLINE model, overlapping memory accesses become dangerous only when the two fetches are semantically related. Bochspwn approximates this relationship using a simple heuristic based on the number of intervening reads, while other systems, such as DECAF, do not attempt to reason about related fetches at all. SHMuzz instead introduces the concept of a shared-memory lifetime, defined by a buffer’s address, size, and the instruction range over which it is accessed. All overlapping accesses within this lifetime are treated as potentially related, as they operate on the same logical buffer.
-
-When SHMuzz detects such an overlapping access, it records a snapshot immediately before the second fetch. Sequential second reads are merged into a single logical event, and redundant snapshots are removed based on execution traces. This process yields one snapshot for each unique overlapping fetch site.
-
-For Trusted Applications, the lifetime of shared memory spans from the entry to \texttt{TA\_InvokeCommandEntryPoint} until the function returns. Although the same memory address may be reused across different invocations, these accesses are considered independent because each call operates on a distinct buffer. Applying this method to the example TA in Listing~\ref{} produces three snapshots, corresponding to the three overlapping fetches observed just before the second read of \texttt{in->size}.
-
-\subsection{Double Fetch Snapshot Fuzzing}
-During the Double Fetch Snapshot Fuzzing stage, SHMuzz evaluates whether an overlapping fetch can be exploited to cause memory corruption. Static techniques, such as DEADLINE, can identify double-fetch bugs but require source code. Existing dynamic methods either rely on manual triage or are not designed to target specific double-fetch sites.
-
-SHMuzz overcomes these limitations by directly fuzzing the value returned by the second fetch. Each snapshot collected in the exploration phase is used to restore the TA to the exact state immediately before the second access. The shared-memory region involved in the double fetch is then replaced with fuzzed input, emulating a successful race by a malicious normal-world client. This allows the fuzzer to explore program behavior after the attacker has altered the shared data.
-
-The target is instrumented with memory safety checks, which terminate execution when a violation occurs. Any resulting crash, therefore, indicates that the corresponding overlapping fetch is potentially exploitable.
-
-In the example from Listing~\ref{}, fuzzing the snapshot captured at line 23 mutates the size argument of a {\tt memcpy} call, rapidly triggering a heap overflow and confirming the presence of a vulnerability.
-
-\subsection{Distillation}
-Not every crash observed during Double Fetch Snapshot Fuzzing is necessarily caused by a shared-memory race. Some failures may stem from unrelated bugs that are reachable even when the shared memory is not modified between accesses. Existing dynamic double-fetch detection techniques do not distinguish between these cases.
-
-This situation is illustrated by the overlapping fetch at line 24 in Listing~\ref{}. During snapshot fuzzing, the fuzzer mutates a comparison value and can trigger a null-pointer dereference. However, this crash can also occur in a normal execution without any shared-memory manipulation, and therefore does not constitute a true double-fetch vulnerability.
-
-To separate genuine shared-memory race bugs from such false positives, SHMuzz performs a replay-based validation step. For each crash discovered during snapshot fuzzing, the program is re-executed from the beginning using the original input that reached the double-fetch site. The crashing value is injected into the corresponding shared-memory region before execution. If the crash still occurs under these conditions, it indicates that the bug is independent of shared-memory races and is discarded. Only crashes that disappear under replay are classified as double-fetch-specific vulnerabilities.
-
-For the overlapping fetch at line 24 in Listing~\ref{}, SHMuzz replays the input that invoked {\tt commandID = 3} and initializes {\tt in->size} to 1234 before execution begins. This replay again triggers the null-pointer dereference, confirming that the crash is not caused by a shared-memory double fetch.
+\subsection{Examples of Binder Drivers}
