@@ -295,120 +295,108 @@ The same pattern appears in every sample driver that retains a device reference:
 
 \subsection{Examples of Binder Drivers}
 
-\begin{figure*}[t]
+\begin{figure}[t]
 \centering
 \begin{tikzpicture}[
-  %% node styles
-  vfsnode/.style  = {draw=gray!60,       fill=gray!12,    rounded corners=3pt,
-                     minimum width=10.4cm, minimum height=0.80cm,
-                     align=center, font=\small},
-  cnode/.style    = {draw=orange!70!black,fill=orange!10,  rounded corners=3pt,
-                     minimum width=4.6cm, minimum height=0.75cm,
-                     align=center, font=\small},
-  rnode/.style    = {draw=blue!60!black,  fill=blue!8,     rounded corners=3pt,
-                     minimum width=4.6cm, minimum height=0.75cm,
-                     align=center, font=\small},
-  typenode/.style = {draw=blue!40!black,  fill=blue!4,     rounded corners=2pt,
-                     minimum width=4.2cm, minimum height=0.65cm,
-                     align=center, font=\scriptsize},
-  badnode/.style  = {draw=red!55!black,   fill=red!6,      rounded corners=2pt,
-                     minimum width=4.2cm, minimum height=0.65cm,
-                     align=center, font=\scriptsize},
-  annot/.style    = {font=\scriptsize\itshape, align=center},
-  %% arrow styles
+  rsh/.style   = {draw=green!55!black,  fill=green!6,   rounded corners=2pt,
+                  minimum width=3.7cm,  minimum height=0.58cm,
+                  align=center, font=\scriptsize},
+  sh/.style    = {draw=orange!60!black, fill=orange!8,  rounded corners=2pt,
+                  minimum width=3.7cm,  minimum height=0.58cm,
+                  align=center, font=\scriptsize},
+  fopsnode/.style = {draw=black!65, fill=yellow!12, rounded corners=3pt,
+                  minimum width=5.2cm,  minimum height=0.65cm,
+                  align=center, font=\small\bfseries},
+  rb/.style    = {draw=green!55!black,  fill=green!8,   rounded corners=2pt,
+                  minimum width=3.7cm,  minimum height=0.92cm,
+                  align=center, font=\scriptsize},
+  cb/.style    = {draw=orange!55!black, fill=orange!8,  rounded corners=2pt,
+                  minimum width=3.0cm,  minimum height=0.92cm,
+                  align=center, font=\scriptsize},
+  sm/.style    = {draw=gray!50, fill=gray!5, rounded corners=2pt,
+                  minimum width=3.7cm,  minimum height=0.52cm,
+                  align=center, font=\tiny},
   main/.style  = {-Stealth, thick},
-  saf/.style   = {-Stealth, thick, blue!55!black},
-  uns/.style   = {-Stealth, thick, orange!55!black},
-  own/.style   = {-Stealth, thick, teal!60!black},
+  safefl/.style= {-Stealth, thick, green!55!black},
+  cfl/.style   = {-Stealth, thick, orange!55!black},
+  alfl/.style  = {orange!60!black, dashed},
 ]
 
-%% -- VFS / binderfs (top, full width) ----------------------------------
-\node[vfsnode] (vfs) at (0, 0)
-  {\textbf{VFS / binderfs (shared C layer)}\\[-2pt]
-   {\scriptsize\texttt{inode->i\_fop = \&\{c,rust\}\_binder\_fops}\quad
-    \texttt{open / ioctl / mmap / release / poll / flush}}};
+%% ── Top row: C support headers ──────────────────────────────────────────
+\node[rsh] (rsh) at (-2.3, 3.85)
+  {\texttt{rust\_binderfs.c} / \texttt{rust\_binder\_internal.h}\\[-2pt]
+   {\tiny(C support for Rust binder)}};
 
-%% -- Column headers -----------------------------------------------------
-\node[annot, orange!70!black] at (-2.8, -1.15) {\textbf{C Binder} (\texttt{binder.c})};
-\node[annot, blue!70!black]   at ( 2.8, -1.15) {\textbf{Rust Binder} (\texttt{drivers/android/binder/})};
+\node[sh]  (csh) at ( 2.3, 3.85)
+  {\texttt{binderfs.c} / \texttt{binder\_internal.h}\\[-2pt]
+   {\tiny(C binder counterparts)}};
 
-%% -- C column -----------------------------------------------------------
-\node[cnode] (calloc) at (-2.8, -1.90)
-  {\texttt{kzalloc} $\rightarrow$ \texttt{binder\_proc *}};
+\draw[alfl] (rsh.east) -- node[above, font=\tiny]{aligned} (csh.west);
 
-\node[badnode] (crawptr) at (-2.8, -2.85)
-  {raw \texttt{*binder\_proc} in \texttt{filp->private\_data}\\
-   \textcolor{red!70!black}{\textit{no lifetime, no compiler check}}};
+%% ── VFS dispatch interface ───────────────────────────────────────────────
+\node[fopsnode] (fops) at (0, 2.85)
+  {\texttt{struct file\_operations}\enspace{\scriptsize(\texttt{inode->i\_fop})}};
 
-\node[badnode] (crefcnt) at (-2.8, -3.80)
-  {manual \texttt{refcount\_inc} / \texttt{refcount\_dec}\\
-   \textcolor{red!70!black}{\textit{convention-enforced pairing}}};
+\draw[main] (rsh.south) -- (rsh.south |- fops.north);
+\draw[main] (csh.south) -- (csh.south |- fops.north);
 
-\node[badnode] (clist) at (-2.8, -4.75)
-  {\texttt{work\_struct} may be inserted into\\
-   any list, or twice $\rightarrow$ silent corruption\\
-   \textcolor{red!70!black}{\textit{no structural guard}}};
+%% ── Rust Binder (left) ───────────────────────────────────────────────────
+\node[rb] (rust) at (-2.3, 1.55)
+  {\textbf{Rust Binder}\\[-2pt]
+   {\tiny\texttt{rust\_binder\_main.rs}}\\[-2pt]
+   {\tiny\texttt{process.rs / context.rs / thread.rs / ...}}};
 
-%% -- Rust column --------------------------------------------------------
-\node[rnode] (rmain) at (2.8, -1.90)
-  {\textbf{\texttt{rust\_binder\_main.rs}}\\[-1pt]
-   {\scriptsize registers \texttt{rust\_binder\_fops}; module init/exit}};
+\draw[safefl] (rust.north)
+  -- node[left, font=\tiny, align=right]{register\\(safe only)}
+  (rust.north |- fops.south);
 
-\node[typenode] (rctx) at (2.8, -2.85)
-  {\texttt{context.rs}\quad\textcolor{teal!70!black}{\texttt{Arc<Context>}}\\[-1pt]
-   entry via \texttt{ArcBorrow<'\_, Context>}};
+%% ── C Binder (right) ─────────────────────────────────────────────────────
+\node[cb] (cbinder) at (2.3, 1.55)
+  {\textbf{C Binder}\\[-2pt]
+   {\tiny\texttt{binder.c}}\\[-2pt]
+   {\tiny\texttt{binder\_alloc.c}}};
 
-\node[typenode] (rproc) at (2.8, -3.80)
-  {\texttt{process.rs}\quad\textcolor{teal!70!black}{\texttt{Arc<Process>}}\\[-1pt]
-   \texttt{ForeignOwnable} $\leftrightarrow$ \texttt{file->private\_data}};
+\draw[cfl] (cbinder.north)
+  -- node[right, font=\tiny]{register}
+  (cbinder.north |- fops.south);
 
-\node[typenode] (rthread) at (2.8, -4.75)
-  {\texttt{thread.rs}\quad\textcolor{teal!70!black}{\texttt{Arc<Thread>}}\\[-1pt]
-   entry via \texttt{ArcBorrow<'\_, Process>}};
+\draw[alfl] (rust.east) -- node[above, font=\tiny]{aligned} (cbinder.west);
 
-\node[typenode] (rtx) at (2.8, -5.70)
-  {\texttt{transaction.rs}\\[-1pt]
-   \texttt{Work<T,\,ID>} $+$ \texttt{ListArc<T,\,ID>}:
-   \textcolor{blue!70!black}{\textit{at most one list slot per ID}}};
+%% ── Rust support chain ───────────────────────────────────────────────────
+\node[sm] (wq)  at (-2.3,  0.25)
+  {\texttt{workqueue.rs} (Work, WorkItem, WorkItemPointer)};
+\node[sm] (wqh) at (-2.3, -0.65)
+  {\texttt{workqueue.h} $\xleftarrow{\text{bindgen}}$ \texttt{workqueue.c}};
 
-%% -- Vertical flow arrows -----------------------------------------------
-\draw[uns] (vfs.south -| calloc) -- (calloc.north);
-\draw[uns] (calloc.south) -- (crawptr.north);
-\draw[uns] (crawptr.south) -- (crefcnt.north);
-\draw[uns] (crefcnt.south) -- (clist.north);
+\draw[main] (rust.south) -- (wq.north);
+\draw[main] (wq.south)   -- (wqh.north);
 
-\draw[saf] (vfs.south -| rmain) -- (rmain.north);
-\draw[own] (rmain.south) -- (rctx.north);
-\draw[own] (rctx.south)  -- (rproc.north);
-\draw[own] (rproc.south) -- (rthread.north);
-\draw[own] (rthread.south) -- (rtx.north);
-
-%% -- Column divider -----------------------------------------------------
-\draw[gray!40, dashed, line width=0.6pt] (0, -1.50) -- (0, -6.15);
-
-%% -- Zone shading -------------------------------------------------------
+%% ── Zone shading ─────────────────────────────────────────────────────────
 \begin{scope}[on background layer]
-  \fill[orange!4, rounded corners=4pt] (-5.4,-1.50) rectangle (-0.05,-6.15);
-  \draw[orange!35, rounded corners=4pt, dashed, line width=0.6pt]
-                                       (-5.4,-1.50) rectangle (-0.05,-6.15);
-  \fill[blue!3,   rounded corners=4pt] ( 0.05,-1.50) rectangle ( 5.4,-6.15);
-  \draw[blue!30,  rounded corners=4pt, dashed, line width=0.6pt]
-                                       ( 0.05,-1.50) rectangle ( 5.4,-6.15);
+  %% Rust zone
+  \fill[green!4,    rounded corners=4pt] (-4.3, 2.05) rectangle (-0.4, -1.05);
+  \draw[green!35!black, dashed, rounded corners=4pt, line width=0.6pt]
+                                         (-4.3, 2.05) rectangle (-0.4, -1.05);
+  \node[font=\tiny, green!50!black] at (-3.8, 1.92)
+    {\textit{modularize + redesign}};
+  %% C zone
+  \fill[orange!4,   rounded corners=4pt] ( 0.4, 2.05) rectangle ( 4.3, 1.00);
+  \draw[orange!35!black, dashed, rounded corners=4pt, line width=0.6pt]
+                                          ( 0.4, 2.05) rectangle ( 4.3, 1.00);
 \end{scope}
 
 \end{tikzpicture}
 \caption{%
-  Structural comparison of the C and Rust Android Binder drivers.
-  Both register identical \texttt{file\_operations} with the shared \texttt{binderfs} layer (top),
-  so the VFS dispatch path is unchanged.
-  The C driver (left) uses raw pointers, manually paired reference counts, and unguarded
-  list insertions.
-  The Rust driver (right) replaces these with \texttt{Arc}-based ownership tracked by the
-  compiler, \texttt{ForeignOwnable} for safe \texttt{file->private\_data} transfer,
-  lifetime-annotated \texttt{ArcBorrow} for entry-point parameters, and
-  \texttt{ListArc<T,\,ID>} to enforce the single-list-slot invariant at compile time.}
+  Structure of the Rust and C Binder drivers (Figure~\ref{fig:binder_design}).
+  Both drivers populate a \texttt{struct file\_operations} table referenced by
+  \texttt{inode->i\_fop}, so the VFS dispatches to either implementation identically.
+  The Rust driver decomposes the monolithic \texttt{binder.c} into typed modules
+  and draws on \texttt{workqueue.rs} as a safe abstraction over the C workqueue;
+  its C support headers (\texttt{rust\_binderfs.c}, \texttt{rust\_binder\_internal.h})
+  are structurally aligned with the C binder counterparts.}
 \label{fig:binder_design}
-\end{figure*}
+\end{figure}
+
 
 Android Binder is the core IPC mechanism of Android, enabling cross-process method calls between applications and system services.
 The Rust Binder driver (\texttt{drivers/android/binder/}) reimplements the same functionality in modular Rust, with the main entry point in \texttt{rust\_binder\_main.rs} and logic split across dedicated modules: \texttt{process.rs}, \texttt{context.rs}, \texttt{transaction.rs}, \texttt{thread.rs}, and others.
