@@ -149,59 +149,28 @@ Despite this architecture, Rust's memory safety guarantees are not absolute or u
 The \texttt{unsafe} keyword marks code regions where the compiler relaxes its safety invariants for five superpowers.
 It allows raw pointer dereferences, unsafe function calls (including calls to foreign language interface), mutable static variable access, unsafe casts, and union field operations.
 Those superpowers are necessary for the feasible implementation of Rust-based system or programs in terms of performance and functionality, such as interrupt handling, memory management, and low-level device drivers.
-Especially, in Rust for Linux, \texttt{unsafe} blocks are an unavoidable necessity: the fundamental mismatch between Rust's strict ownership model and C's type system---in particular around pointer aliasing, validity, and lifetime management---means that no safe abstraction can be built without an
-\texttt{unsafe} foundation.
-The project therefore adopts a discipline: \texttt{unsafe} code should be
-confined to the abstraction layers, rigorously documented, and individually
-justified, so that driver code above can remain \texttt{unsafe}-free.
-Our study reveals that \texttt{unsafe} usage is not uniformly distributed
-across the kernel's Rust codebase; it is heavily concentrated in the
-abstraction layer, while driver-level code remains largely free of explicit
-\texttt{unsafe} blocks (see Figure~\ref{fig:unsafe_dist} and
-Table~\ref{tab:unsafe_stats}). % TODO: fill in figure and table
+Especially, in Rust for Linux, \texttt{unsafe} blocks are an unavoidable necessity: the fundamental mismatch between Rust's strict ownership model and C's unconstrainted type system means that no safe abstraction can be built without an \texttt{unsafe} foundation.
+The project therefore adopts a discipline: \texttt{unsafe} code should be confined to the abstraction layers with rigorous documentation and review process, so that driver code above can remain \texttt{unsafe}-free.
 
-Prior research has examined Rust security from two complementary angles.
-A first line of work focuses on automated detection of \texttt{unsafe} bugs
-in the broader Rust ecosystem.
-RUDRA~\cite{TODO:bae2021rudra} performs inter-procedural dataflow analysis
-to find unsound patterns in unsafe Rust APIs, targeting violations of
-higher-order safety invariants and incorrect \texttt{Send}/\texttt{Sync}
-implementations commonly found in published crates.
-SafeDrop~\cite{TODO:safedrop} targets use-after-free and double-free
-vulnerabilities by tracking ownership transfer and drop semantics through a
-path-sensitive analysis of Rust's Mid-level Intermediate Representation
-(MIR), making it effective at catching lifetime-related misuse.
-TypePulse~\cite{TODO:typepulse} takes a type-confusion-centric approach,
-identifying bugs that arise from unsound type casts in \texttt{unsafe}
-code---a vulnerability class of particular relevance at FFI boundaries
-where Rust and C types are coerced into one another.
-While all three tools target \texttt{unsafe}-related memory bugs, they
-differ in their underlying representations, targeted vulnerability classes,
-and scope: RUDRA and SafeDrop are designed for the Rust crate ecosystem,
-whereas TypePulse is specifically oriented toward cross-language type safety
-at FFI boundaries.
+Prior research has examined Rust security mainly for the broader Rust ecosystem and concentrates on automated detection of \texttt{unsafe} bugs.
+RUDRA~\cite{TODO:bae2021rudra} performs inter-procedural dataflow analysis to find unsound patterns in unsafe Rust APIs, targeting violations of higher-order safety invariants and incorrect \texttt{Send}/\texttt{Sync} implementations commonly found in published crates.
+SafeDrop~\cite{TODO:safedrop} targets use-after-free and double-free vulnerabilities by tracking ownership transfer and drop semantics through a path-sensitive analysis of Rust's Mid-level Intermediate Representation(MIR), making it effective at catching lifetime-related misuse.
+TypePulse~\cite{TODO:typepulse} takes a type-confusion-centric approach, identifying bugs that arise from unsound type casts in \texttt{unsafe} code, particular relevance at foreign language interface (FFI) boundaries where Rust and C types are coerced into one another.
+While all three tools target \texttt{unsafe}-related memory bugs, they differ in their underlying representations, targeted vulnerability classes, and scope: RUDRA and SafeDrop are designed for the Rust crate ecosystem, whereas TypePulse is specifically oriented toward cross-language type safety at FFI boundaries.
 
-A second, complementary line of work takes an empirical perspective on
-Rust's integration into the Linux kernel itself.
-Li et al.~\cite{TODO:li2024empirical} conducted the first large-scale
-qualitative study of the Rust for Linux project through developer mailing
-lists, patch discussions, and issue reports, documenting sources of success,
-dissatisfaction, and compromise in the project's early stages.
-While this study provides valuable sociological and high-level architectural
-insight, it is necessarily broad: it was conducted before the project had
-reached sufficient maturity to include complex, production-quality driver
-examples, and it does not systematically analyze the design and safety
-properties of the abstraction layer, nor does it characterize how
-\texttt{unsafe} is justified and distributed within it.
+Another line of Rust research takes an empirical perspective on how \texttt{unsafe} code is actually adopted across the Rust ecosystem.
+Evans et al.~\cite{evans2020rust} conducted one of the first large-scale studies of \texttt{unsafe} usage across crates.io, finding that although fewer than 30\% of libraries invoke the \texttt{unsafe} keyword directly, the majority cannot be fully statically verified by the compiler because unsafeness propagates transitively through dependency call chains.
+Astrauskas et al.~\cite{astrauskas2020programmers} subsequently evaluated the so-called \emph{Rust hypothesis}, which holds that programmers use \texttt{unsafe} sparingly, keep it easy to review, and hide it behind safe abstractions. They tested this hypothesis by querying a large corpus of crates with their QRATES tool over both source code and MIR. They identified six recurring motivations for \texttt{unsafe} code and reported that the hypothesis holds only partially.
+Cui et al.~\cite{cui2024achilles} approached the problem from the perspective of safety requirements rather than usage frequency. By analyzing the standard library's \texttt{unsafe} API documentation, they distilled 19 safety properties, labeled 416 \texttt{unsafe} APIs, and cross-referenced them against historical Rust CVEs and crates.io usage, revealing that the documented safety requirements are frequently inconsistent and incomplete. It poses the challenge to Rust programmers to understand and fulfill the safety requirements accordingly.
 
-In this paper, we present the first systematic study of the evolution of
-Rust for Linux, with a focus on the design and safety of its abstraction
-layers and the disciplined use of \texttt{unsafe} Rust in real kernel code.
-We trace how the Rust-C interface has been designed and refined over
-successive kernel releases, systematically analyze the rationale behind
-\texttt{unsafe} usage across the full abstraction stack, and distill the
-practical guidelines and best practices that have emerged from the project
-for future Rust kernel development.
+Different from these studies all characterizing \texttt{unsafe} usage or obligations of Rust-based codebases across the open-source crate ecosystem at large, Li et al.~\cite{TODO:li2024empirical} conducted the first large-scale qualitative study of Rust's integration into the C-written Linux kernel.
+It examines the Rust for Linux project through developer mailing lists, patch discussions, and issue reports, documenting sources of success, dissatisfaction, and compromise in the project's early stages.
+While this study provides valuable sociological and high-level architectural insight, it is necessarily broad: it was conducted before the project had reached sufficient maturity to include complex, production-quality driver examples, and it does not systematically analyze the safety properties and  changes of abstraction layers, nor does it feature how \texttt{unsafe} is utilized and distributed within it.
+
+In this paper, we present the systematic and in-depth study of the evolution of the non-experimental Rust for Linux, with a focus on the design and safety of its abstraction layers and the disciplined use of \texttt{unsafe} Rust in real kernel code. Our study shows that \texttt{unsafe} usage is unevenly distributed across Rust-for-Linux and the abstraction layer continues evolving as the new drivers are introduced and the project matures, instead of directly mirroring the existing C codebase.
+
+We trace the Rust integration on how the abstraction layers have been designed and refined over successive kernel releases and analyze the pros and cons it brings compared to the existing C codebase. 
+Further, we systematically summarize the rationale behind \texttt{unsafe} usage, and distill the practical guidelines and best practices that have emerged from the project for future Rust kernel development.
 
 \medskip
 \noindent\textbf{Contributions.} This paper makes the following contributions:
@@ -210,22 +179,20 @@ for future Rust kernel development.
     \item \textbf{Architectural analysis.} We provide a comprehensive
     longitudinal analysis of the Rust for Linux abstraction layer design,
     tracing its evolution from the initial Rust support in Linux~v6.1 to the
-    current state of the art, and characterizing the key design decisions that
-    govern Rust-C interoperability.
+    current state of the art, and characterizing the key primitives that
+    govern the Rust-C interoperability.
 
     \item \textbf{Unsafe characterization.} We systematically study the
     distribution, rationale, and evolution of \texttt{unsafe} blocks across
     abstraction layers and drivers in the Rust for Linux codebase, revealing
-    consistent patterns in how and why \texttt{unsafe} is used and how these
-    patterns have changed as the project has matured.
+    consistent patterns in how and why \texttt{unsafe} is utilized and how these
+    patterns have changed as the project matures.
 
     \item \textbf{Design guidelines.} We distill a set of practical design
     principles and best practices for writing safe Rust kernel code, grounded
-    in the hard-won experience of the Rust for Linux project and intended to
-    guide future development of Rust-based kernel components and other
-    Rust-C systems-level software.
+    in the real experience of the Rust for Linux project and intended to
+    guide future development of other Rust-C system-level projects.
 \end{itemize}
-
 
 \input{sections/background}
 
