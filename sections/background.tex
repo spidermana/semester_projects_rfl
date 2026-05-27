@@ -49,10 +49,8 @@ These rules, together with \emph{lifetimes}, make reference validity explicit in
 For example, traits can be used as generic bounds (e.g., \texttt{T:~Send + Sync}) to
 encode contracts statically, so that properties like thread-safety are checked at compile time rather than enforced by uncontrollable programming conventions.
 
-Compared with C, safe Rust alone, however, cannot express all the patterns required for efficient and flexible programming, like for kernel development. For instance, doubly-linked intrusive lists, like ``struct hlist\_head'' or ``struct list\_node'' in Linux kernel, requires each node to hold both a forward and a backward pointer into the same list, which violates Rust's single-ownership rule or no mutable aliasing. The borrow checker simply cannot verify that such aliased mutations are safe.
-Likewise, self-referential structures, zero-copy DMA buffers, and shared
-mutable global state all fall outside what safe Rust can express, yet each
-is a routine building block of kernel code.
+Compared with C, safe Rust alone, however, cannot express all the patterns required for efficient and flexible programming, like for kernel development. For instance, doubly-linked intrusive lists, like commonly used ``hlist\_head'' or ``list\_node'' data structures in Linux kernel, requires each node to hold both a forward and a backward pointer into the same list, which violates Rust's single-ownership rule or no mutable aliasing. The borrow checker simply cannot verify that such aliased mutations are safe.
+In addition, the ``container\_of'' or ``offset\_of'' macro operations to data structures in Linux kernel are also unexpressible in safe Rust, as they recover a struct pointer from the address of one of its fields via raw pointer arithmetic and dereference. Likewise, self-referential structures, zero-copy DMA buffers, and shared mutable global state all fall outside what safe Rust can express, yet each is a routine building block of kernel code.
 
 
 \begin{figure}[b]
