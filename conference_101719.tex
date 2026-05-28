@@ -143,7 +143,7 @@ Empirical analyses of the Linux CVE database consistently show that a majority o
 
 Rust~\cite{TODO:rust_book} has emerged as a feasible and principled response to this challenge. As a modern system programming language with memory safety and efficiency as its core design goals, Rust enforces strict ownership, borrowing, and lifetime rules through its type system and borrow checker, statically and dramatically eliminating most classes of memory errors at compile time. Unlike garbage-collected languages, it is crucial to note that Rust achieves these guarantees without a runtime overhead, preserving the low-level control and performance required for kernel development.
 
-Motivated by these properties, the Rust for Linux project~\cite{TODO:ojeda2022rust, TODO:rustforlinux} was initiated to introduce Rust as a second implementation language in the Linux kernel. The goal is not to rewrite the existing kernel in Rust, but to allow newly-involved security-critical drivers and kernel subsystems to be developed in idiomatic, safe Rust.
+Motivated by these properties, the Rust for Linux (RFL) project~\cite{TODO:ojeda2022rust, TODO:rustforlinux} was initiated to introduce Rust as a second implementation language in the Linux kernel. The goal is not to rewrite the existing kernel in Rust, but to allow newly-involved security-critical drivers and kernel subsystems to be developed in idiomatic, safe Rust.
 After extensive preparatory work spanning several years, Rust support was merged into the mainline kernel at Linux~v6.1~\cite{TODO:linux_v6.1}. Today, Rust is widely regarded as a successful second language in the kernel community, and its status has continued to mature following the removal of the ``experimental'' label in Linux~v6.19~\cite{TODO:linux_v6.19}.
 The project follows a layered architecture: the existing C kernel infrastructure forms the foundation; a thin layer of \texttt{unsafe} Rust bindings bridges Rust to the C~APIs; an elaborately-designed and carefully-reviewed \emph{safe abstraction layer} wraps these bindings and exposes ergonomic, safe Rust interfaces; and Rust drivers are then built on top of this abstraction layer.
 This design localizes majority of \texttt{unsafe} blocks, the only source of memory safety issues in Rust code, to the abstraction layer and shields the leaf driver code from direct C interoperability hazards and the associated security risks.
@@ -203,7 +203,7 @@ Further, we systematically summarize the rationale behind \texttt{unsafe} usage,
 
 \input{sections/unsafe}
 
-\input{sections/practice}
+% \input{sections/practice}
 
 \section{Conclusion}
 

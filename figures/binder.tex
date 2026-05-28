@@ -1,0 +1,87 @@
+\begin{figure}[t]
+    \centering
+    \begin{tikzpicture}[
+      rsh/.style   = {draw=green!55!black,  fill=green!6,   rounded corners=2pt,
+                      minimum width=3.7cm,  minimum height=0.58cm,
+                      align=center, font=\scriptsize},
+      sh/.style    = {draw=orange!60!black, fill=orange!8,  rounded corners=2pt,
+                      minimum width=2.8cm,  minimum height=0.58cm,
+                      align=center, font=\scriptsize},
+      fopsnode/.style = {draw=yellow!65!black, fill=yellow!8, rounded corners=3pt,
+                      minimum width=6.2cm,  minimum height=0.65cm,
+                      align=center, font=\small\bfseries},
+      rb/.style    = {draw=green!55!black,  fill=green!8,   rounded corners=2pt,
+                      minimum width=3.7cm,  minimum height=0.92cm,
+                      align=center, font=\scriptsize},
+      cb/.style    = {draw=orange!55!black, fill=orange!8,  rounded corners=2pt,
+                      minimum width=2.0cm,  minimum height=0.92cm,
+                      align=center, font=\scriptsize},
+      sm/.style    = {draw=gray!50, fill=gray!5, rounded corners=2pt,
+                      minimum width=3.7cm,  minimum height=0.52cm,
+                      align=center, font=\scriptsize},
+      main/.style  = {-Stealth, thick},
+      safefl/.style= {-Stealth, thick, green!55!black},
+      cfl/.style   = {-Stealth, thick, orange!55!black},
+      alfl/.style  = {red!60!black, dashed},
+    ]
+    
+    %% ── Top row: C support headers ──────────────────────────────────────────
+    \node[rsh] (rsh) at (-2.5, 3.85)
+      {\texttt{rust\_binderfs.c}\\ \texttt{rust\_binder\_internal.h}\\[-1pt]
+       {\scriptsize(Supported by Rust Binder)}};
+    
+    \node[sh]  (csh) at ( 2.5, 3.85)
+      {\texttt{binderfs.c} \\ \texttt{binder\_internal.h}\\[-1pt]
+       {\scriptsize(Supported by C Binder)}};
+    
+    \draw[alfl] (rsh.east) -- node[above, font=\scriptsize]{counterpart} (csh.west);
+    
+    %% ── VFS dispatch interface ───────────────────────────────────────────────
+    \node[fopsnode] (fops) at (0, 2.55)
+      {\scriptsize VFS:\enspace\texttt{struct file\_operations}\enspace{\scriptsize(\texttt{inode->i\_fop})}};
+    
+    \draw[main] (rsh.south) -- (rsh.south |- fops.north);
+    \draw[main] (csh.south) -- (csh.south |- fops.north);
+    
+    %% ── Rust Binder (left) ───────────────────────────────────────────────────
+    \node[rb] (rust) at (-2.3, 1.05)
+      {\textbf{Rust Binder}\\[-2pt]
+       {\tiny\texttt{rust\_binder\_main.rs}}\\[-2pt]
+       {\tiny\texttt{process.rs / context.rs / thread.rs / ...}}};
+    
+    \draw[safefl] (rust.north)
+      -- node[left, font=\scriptsize, align=right]{register\\(safe only)}
+      (rust.north |- fops.south);
+    
+    %% ── C Binder (right) ─────────────────────────────────────────────────────
+    \node[cb] (cbinder) at (2.3, 1.05)
+      {\textbf{C Binder}\\[-2pt]
+       {\tiny\texttt{binder.c}}\\[-2pt]
+       {\tiny\texttt{binder\_alloc.c}}};
+    
+    \draw[cfl] (cbinder.north)
+      -- node[right, font=\scriptsize]{register}
+      (cbinder.north |- fops.south);
+    
+    \draw[alfl] (rust.east) -- node[above, font=\scriptsize]{aligned} (cbinder.west);
+    
+    %% ── Rust support chain ───────────────────────────────────────────────────
+    \node[sm] (wq)  at (-2.3,  -0.25)
+      {\textbf{WorkItem Abstractions}\\[-2pt] \tiny\texttt{workqueue.rs}};
+    \node[sm] (wqh) at (-2.3, -1.25)
+      {\tiny{raw bindings} $\xleftarrow{\text{bindgen}}$ \tiny\texttt{workqueue.h} $\xleftarrow{\text{}}$ \tiny\texttt{workqueue.c}};
+    
+    \draw[main] (rust.south) -- (wq.north);
+    \draw[main] (wq.south) -- (wqh.north);
+    
+    
+    \end{tikzpicture}
+    \caption{%
+      Structure of the Rust and C Binderfs.
+      Both drivers populate a \texttt{struct file\_operations} table referenced by
+      \texttt{inode->i\_fop}, so the VFS dispatches to either implementation identically.
+      The Rust driver decomposes the monolithic \texttt{binder.c} into typed modules
+      and draws on \texttt{workqueue.rs} as a safe abstraction over the C workqueue.}
+    \label{fig:binder_design}
+    \end{figure}
+    

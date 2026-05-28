@@ -1,1 +1,212 @@
 \section{Rationale and Evolution of Unsafe Usage}\label{sec:unsafe}
+
+
+% 2. unsafe involved reasons and distribution
+% 3. idiomatic usage of unsafe is more important than the number of unsafe blocks
+% 4. use cases of unsafe
+
+
+\subsection{Commit Analysis}
+In this project, we conducted a commit analysis to observe the evolution of the whole Rust for Linux codebase. 
+The Rust for Linux project is organized as the same structure as the original Linux kernel project in terms of the directory structure.
+Therefore, simply by analyzing the commit history on each directory of the Rust for Linux codebase, we can obtain an overview of the emphasis of the whole project during each development period.
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\textwidth]{figures/loc-stats-pct-stacked.png}
+    \caption{The proportion of lines of code (LoC) on each commit in each directory of the Rust for Linux codebase.}
+    \label{fig:commit_analysis}
+\end{figure*}
+
+As shown in~\autoref{fig:commit_analysis}, since the initial commit of Rust for Linux in September 2020, the core infrastructure of Rust for Linux is always the key focus. The reason is that the core infrastructure of Rust for Linux is the foundation of the whole project, which is necessary for each existing leaf drivers and new incoming leaf drivers. 
+At the very beginning, Rust for Linux established a Rust-side kernel-module definition mechanism centered on the module! macro, which binds a module type to kernel metadata and generates the C-compatible initialization, cleanup, and `.modinfo' glue required by the Linux module system.
+After that, RFL gradually built up the basic infrastructure and very basic integration with the existing C kernel subsystems, which also keeps evolving over time by supporting more and more C kernel subsystems and their corresponding Rust drivers. With the guidance of the initial reference drivers, RFL starts to move the focus to the subsystem abstractions and real Rust drivers, and thus bind more tightly with the C-side of the kernel. As illustrated in Figure~\autoref{fig:commit_analysis}, those carefully designed abstractions further facilitate the better implementation of safe Rust drivers, which is the main goal of RFL.
+The reduction of commits is also indirectly proved that RFL is evolving from the initial experimental phase to the more stable, mature and robust phase.
+
+\subsection{Unsafe Necessitates and Distribution}
+
+We analyzed the unsafe usage in the RFL codebase at HEAD (Linux~6.19.7, commit \texttt{0d87da0c}).
+In total, 2{,}031 unsafe sites were identified across 1{,}791 in the abstraction layer (\texttt{rust/kernel/}) and 237 in the driver layer.
+Table~\ref{tab:unsafe-kind} breaks them down by syntactic kind and Table~\ref{tab:unsafe-label} by semantic reason.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{lr}
+    \hline
+    \textbf{Syntactic Kind} & \textbf{Count} \\
+    \hline
+    Unsafe function/method call   & 1{,}234 \\
+    Raw-pointer dereference        &   485 \\
+    \texttt{unsafe impl} (trait impl) &   308 \\
+    Union field access             &     4 \\
+    \hline
+    \textbf{Total}                & \textbf{2{,}031} \\
+    \hline
+    \end{tabular}
+    \caption{Distribution of unsafe sites by syntactic kind in the RFL codebase at Linux~6.19.7.}
+    \label{tab:unsafe-kind}
+\end{table}
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{lr}
+    \hline
+    \textbf{Semantic Reason} & \textbf{Label Instances} \\
+    \hline
+    FFI / C bindings    & 810 \\
+    Type conversion     & 614 \\
+    Synchronization     & 447 \\
+    MMIO / hardware I/O & 426 \\
+    Raw-pointer arithmetic & 342 \\
+    Pin / in-place init & 148 \\
+    Allocation          & 109 \\
+    User-memory access  &   9 \\
+    \hline
+    \end{tabular}
+    \caption{Semantic reasons for unsafe usage (a single site may carry multiple labels).}
+    \label{tab:unsafe-label}
+\end{table}
+
+\paragraph{Insights.}
+Several structural patterns emerge from the data.
+
+\textit{Unsafe concentrates in the abstraction layer, not in drivers.}
+Over 88\% of all unsafe sites reside in \texttt{rust/kernel/}, the safe abstraction layer, while only 11.7\% appear in the actual driver code.
+This validates the architectural intent described in Section~\ref{sec:design}: unsafe is an implementation detail of the abstraction layer, not something drivers should reason about.
+A driver that accumulates unsafe blocks is almost certainly working around a missing or incomplete abstraction rather than following the intended design.
+
+\textit{FFI-binding calls are the single largest driver of unsafe.}
+The dominant semantic label is \emph{ffi-bindings} (810 instances, carried by approximately 40\% of all unsafe sites).
+Every interaction with a C kernel API---registering a device, acquiring a spinlock, scheduling work---goes through a \texttt{bindings::} call that Rust cannot verify.
+This cost is irreducible: the kernel's C subsystems will not expose a Rust-native interface, so every abstraction module pays the FFI toll at its boundary.
+
+\textit{Type conversion and synchronization are inseparable companions.}
+The second and third largest labels are \emph{type-conversion} (614) and \emph{synchronization} (447).
+They typically co-occur: when acquiring or releasing a kernel lock, the abstraction must cast an \texttt{Opaque<bindings::mutex>} pointer to a raw C pointer, call the C function, and recover a typed Rust value---a chain that combines an FFI call, a type cast, and a synchronization semantic in a single unsafe site.
+
+\textit{Pin and in-place initialization introduce a distinct class of unsafe.}
+The \emph{pin-init} label accounts for 148 instances, concentrated in modules such as \texttt{sync::arc} and \texttt{workqueue} that manage kernel objects whose address must be stable.
+This class of unsafe is largely unique to RFL: because many kernel C structs are self-referential or registered by pointer with the kernel, they must be pinned after initialization, which requires bypassing Rust's normal move semantics through carefully documented unsafe code.
+
+\textit{MMIO and raw-pointer arithmetic reflect hardware realities.}
+The \emph{mmio-hardware} (426) and \emph{raw-pointer} (342) labels arise in subsystem abstractions that wrap memory-mapped I/O, DMA, physical pages, or intrusive data structures.
+These are inherent to systems programming and cannot be eliminated without replacing the corresponding C infrastructure.
+
+\paragraph{Idiomatic Unsafe Matters More Than Count.}
+A naive reading of Table~\ref{tab:unsafe-kind} might suggest that more unsafe blocks indicate a more dangerous codebase.
+In RFL, this interpretation is incorrect and misleading.
+The relevant metric is not \emph{how many} unsafe sites exist, but \emph{where} they are located, \emph{how well} each one is documented, and whether the unsafe surface exposed to callers grows or shrinks over time.
+The following two case studies draw on the cross-version data to make this concrete.
+
+\subsubsection{Case Study 1: The Lock Infrastructure---More Unsafe Inside, None Outside}
+
+The evolution of the kernel lock abstractions between the initial out-of-tree RFL codebase and the mainline kernel is one of the clearest examples of unsafe growing in the right direction.
+
+In the early RFL tree, the mutex implementation in \texttt{rust/kernel/sync/mutex.rs} had one critical flaw in its design: the constructor was declared \texttt{unsafe}:
+
+\begin{lstlisting}[language=Rust,columns=fullflexible]
+// Old (pre-mainline): constructor is unsafe fn
+impl<T> Mutex<T> {
+    /// # Safety
+    /// The caller must call `Mutex::init` before using the mutex.
+    pub unsafe fn new(t: T) -> Self { ... }
+}
+\end{lstlisting}
+
+\noindent Because initialization was a two-step protocol---construct first, then call \texttt{mutex\_init!} to register the lock class---the safety burden fell entirely on the caller.
+Every driver that created a mutex had to write explicit \texttt{unsafe} blocks and manually sequence the initialization.
+The sample driver \texttt{rust\_miscdev.rs} from the same period shows what this looked like in practice:
+
+\begin{lstlisting}[language=Rust,columns=fullflexible]
+// Old driver code: five unsafe blocks to construct one struct
+Self {
+    // SAFETY: `condvar_init!` is called below.
+    state_changed: unsafe { CondVar::new() },
+    // SAFETY: `mutex_init!` is called below.
+    inner: unsafe { Mutex::new(SharedStateInner { token_count: 0 }) },
+},
+|mut state| {
+    let pinned = unsafe {
+        state.as_mut().map_unchecked_mut(|s| &mut s.state_changed)
+    };
+    kernel::condvar_init!(pinned, "SharedState::state_changed");
+    let pinned = unsafe {
+        state.as_mut().map_unchecked_mut(|s| &mut s.inner)
+    };
+    kernel::mutex_init!(pinned, "SharedState::inner");
+}
+\end{lstlisting}
+
+\noindent The SAFETY comment ``\texttt{mutex\_init!} is called below'' encodes a temporal ordering constraint that neither the compiler nor the type system can verify.
+Forgetting the \texttt{mutex\_init!} call, or calling it after the mutex had already been locked, would produce silent undefined behavior.
+
+In the mainline kernel, this was resolved by redesigning the lock infrastructure around the \texttt{Backend} unsafe trait and the \texttt{pin\_init} framework~\cite{TODO:ojeda2022rust}.
+The new \texttt{rust/kernel/sync/lock.rs} exposes a \emph{safe} constructor:
+
+\begin{lstlisting}[language=Rust,columns=fullflexible]
+// New (mainline): constructor is safe, returns a PinInit
+impl<T, B: Backend> Lock<T, B> {
+    pub fn new(t: impl PinInit<T>, name: &'static CStr,
+               key: Pin<&'static LockClassKey>)
+        -> impl PinInit<Self>
+    { ... }
+}
+\end{lstlisting}
+
+\noindent The equivalent driver code now contains zero unsafe blocks for lock construction:
+
+\begin{lstlisting}[language=Rust,columns=fullflexible]
+// New driver code: zero unsafe blocks
+#[pin_data]
+struct SharedState {
+    #[pin]
+    state_changed: CondVar,
+    #[pin]
+    inner: Mutex<SharedStateInner>,
+}
+impl SharedState {
+    fn new() -> impl PinInit<Self> {
+        pin_init!(Self {
+            state_changed <- new_condvar!(),
+            inner <- new_mutex!(SharedStateInner { token_count: 0 }),
+        })
+    }
+}
+\end{lstlisting}
+
+The unsafe site count in the lock implementation went from 24 (old: \texttt{mutex.rs}~9 + \texttt{spinlock.rs}~9 + \texttt{guard.rs}~6) to 47 (new: \texttt{lock.rs}~25 + \texttt{lock/mutex.rs}~11 + \texttt{lock/spinlock.rs}~11)---nearly double.
+Yet every one of those 47 sites is entirely internal: they sit inside the \texttt{unsafe trait Backend} contract or its implementations, and no driver ever calls them directly.
+The user-facing unsafe count dropped from \emph{five} blocks per struct to \emph{zero}.
+This is precisely the evolution the RFL architecture demands: more unsafe in a single, reviewable location; none in the code that grows with each new driver.
+
+\subsubsection{Case Study 2: \texttt{cpufreq}---Unsafe Absorbed at the Boundary, Absent in the Driver}
+
+The cpufreq Rust abstraction and driver, introduced together in v6.16, provide a quantitative demonstration of the abstraction layer's role.
+\texttt{rust/kernel/cpufreq.rs} carries 72 unsafe sites: 25 call sites for FFI functions (\texttt{cpufreq\_register\_driver}, \texttt{cpufreq\_cpu\_get}, etc.), 45 raw-pointer dereferences for converting C \texttt{cpufreq\_policy} pointers to Rust references, and 2 \texttt{unsafe impl} declarations.
+The corresponding driver, \texttt{drivers/cpufreq/rcpufreq\_dt.rs}, contains exactly \textbf{3} unsafe sites.
+
+Crucially, none of the driver's 3 unsafe sites are FFI calls or pointer dereferences.
+Each one is a deliberate, documented lifetime certification:
+
+\begin{lstlisting}[language=Rust,columns=fullflexible]
+// SAFETY: The CPU device is only used during init; it won't get
+// hot-unplugged. The cpufreq core registers with CPU notifiers
+// and the cpufreq core/driver won't use the CPU device, once
+// the CPU is hot-unplugged.
+let dev = unsafe { cpu::from_cpu(cpu)? };
+...
+// SAFETY: The `freq_table` is not dropped while it is getting
+// used by the C code.
+unsafe { policy.set_freq_table(&freq_table) };
+
+// SAFETY: The returned `clk` is not dropped while it is
+// getting used by the C code.
+let clk = unsafe { policy.set_clk(dev, None)? };
+\end{lstlisting}
+
+The driver author is not reasoning about FFI, struct layout, or atomics---they are asserting local invariants about object lifetimes that the Rust type system alone cannot enforce.
+These are exactly the kinds of \texttt{unsafe} blocks that an expert reviewer can validate quickly: each SAFETY comment is one sentence about when a specific pointer stops being valid.
+
+The 72:3 ratio (24:1) is not an artifact of a specific driver; it reflects the architectural guarantee.
+Every new driver built on this abstraction inherits the same property: the FFI complexity is paid once, in a reviewed module, and the driver's unsafe surface consists only of high-level lifetime decisions.
+This is what idiomatic unsafe looks like in RFL---not zero unsafe in drivers, but \emph{the right kind} of unsafe, minimally and deliberately placed, with each instance carrying an auditable justification.

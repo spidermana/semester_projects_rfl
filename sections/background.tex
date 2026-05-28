@@ -53,28 +53,29 @@ Compared with C, safe Rust alone, however, cannot express all the patterns requi
 In addition, the ``container\_of'' or ``offset\_of'' macro operations to data structures in Linux kernel are also unexpressible in safe Rust, as they recover a struct pointer from the address of one of its fields via raw pointer arithmetic and dereference. Likewise, self-referential structures, zero-copy DMA buffers, and shared mutable global state all fall outside what safe Rust can express, yet each is a routine building block of kernel code.
 
 
-\begin{figure}[b]
-  \begin{lstlisting}[columns=fullflexible]
-  // (i) raw-pointer dereference
-  fn read_raw(ptr: *const u32) -> u32 {
-      unsafe { *ptr }            // compiler does NOT check validity
-  }
-  
-  // (ii) FFI call to a C kernel function
-  extern "C" {
-      fn kmalloc(size: usize, flags: u32) -> *mut u8;
-  }
-  pub fn alloc_buf(size: usize) -> *mut u8 {
-      unsafe { kmalloc(size, 0x80) }  // GFP_KERNEL = 0x80
-  }
-  \end{lstlisting}
-  \captionof{lstlisting}{%
-    Two representative \texttt{unsafe} Rust patterns.
-    Raw-pointer dereference (lines 2--4) bypasses the borrow checker;
-    the FFI call (lines 7--12) crosses the Rust-C boundary.
-    Both require the programmer to manually uphold safety invariants.}
-  \label{lst:unsafe_example}
-  \end{figure}
+\begin{listing}
+\begin{lstlisting}[columns=fullflexible]
+// (i) raw-pointer dereference
+fn read_raw(ptr: *const u32) -> u32 {
+    unsafe { *ptr }            // compiler does NOT check validity
+}
+
+// (ii) FFI call to a C kernel function
+extern "C" {
+    fn kmalloc(size: usize, flags: u32) -> *mut u8;
+}
+pub fn alloc_buf(size: usize) -> *mut u8 {
+    unsafe { kmalloc(size, 0x80) }  // GFP_KERNEL = 0x80
+}
+\end{lstlisting}
+\captionof{lstlisting}{
+Two representative \texttt{unsafe} Rust patterns.
+Raw-pointer dereference (lines 2--4) bypasses the borrow checker;
+the FFI call (lines 7--12) crosses the Rust-C boundary. Both require the programmer to manually uphold safety invariants.
+}
+\label{lst:unsafe_example}
+\end{listing}
+
 
 The \texttt{unsafe} keyword exists precisely to cover these gaps. It marks code regions where the compiler relaxes its safety invariants, granting five additional capabilities: dereferencing raw pointers, calling \texttt{unsafe} functions (including FFI), accessing or modifying mutable static variables, implementing \texttt{unsafe} traits, and accessing union fields. \autoref{lst:unsafe_example} illustrates two representative uses: (i)~a
 raw-pointer dereference, and (ii)~an FFI call to a C function.
@@ -89,6 +90,7 @@ Notably, \texttt{unsafe} Rust therefore requires a strong discipline from the pr
   \centering
   \caption{Key milestones and representative Rust drivers in the Linux kernel.
   \cmark{} indicates merged into mainline; \xmark{} indicates out-of-tree.}
+  \label{tab:rust_drivers}
   \footnotesize
   \setlength{\tabcolsep}{4pt}
   \renewcommand{\arraystretch}{1.12}
@@ -162,7 +164,6 @@ Notably, \texttt{unsafe} Rust therefore requires a strong discipline from the pr
       & \xmark{} \\
     \bottomrule
   \end{tabular*}
-  \label{tab:rust_drivers}
 \end{table*}
 
 
